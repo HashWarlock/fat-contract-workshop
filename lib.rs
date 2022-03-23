@@ -1,25 +1,43 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-
-use ink_lang as ink;
+extern crate alloc;
+use pink_extension as pink;
 
 #[ink::contract]
 mod auction_house {
+    use super::pink;
+    use pink::{PinkEnvironment, http_post, http_get};
     use ink_env::{DefaultEnvironment};
     use ink_storage::traits::{
+        SpreadAllocate,
         SpreadLayout,
         StorageLayout
     };
+    use scale::{Decode, Encode};
+    use alloc::{
+        string::{String, ToString},
+        vec::Vec, format
+    };
+    use phat_messenger::PhatMessengerRef;
 
-    pub type TokenId = u128;
+    /// Messenger structure
+    #[derive(Debug, Eq, PartialEq)]
+    pub struct MessengerBot {
+        headers: Vec<(String, String)>,
+        text: String,
+        url: String,
+        chat_id: String,
+    }
 
     /// Auction structure
-    #[derive(Default, Debug, Clone, PartialEq, scale::Encode, scale::Decode, SpreadLayout)]
+    #[derive(Default, Debug, Clone, PartialEq, Encode, Decode, SpreadLayout)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink_storage::traits::StorageLayout))]
     pub struct Auction {
+        /// Owner of the Auction
+        owner: AccountId,
         /// ID for the RMRK NFT
-        token_id: TokenId,
+        token_id: String,
         /// The current highest bid amount
-        amount: Balance,
+        amount: u128,
         /// The time the action started
         start_time: Timestamp,
         /// The time that the auction is scheduled to end
@@ -32,22 +50,22 @@ mod auction_house {
 
     /// Auction House
     #[ink(storage)]
-    #[derive(scale::Encode, scale::Decode)]
+    #[derive(SpreadAllocate)]
     pub struct AuctionHouse {
         /// Auction House Owner
         owner: AccountId,
-        /// Token to be auctioned
-        token_auction: Option<Auction>,
-        /// todo: Token contract
-        token_contract: TokenId,
+        /// Auctions mapping by Token ID
+        token_auctions: Mapping<String, Auction>,
         /// The minimum of time left after a new bid is created
         time_buffer: u64,
         /// The minimum price accepted in an auction
-        reserve_price: Balance,
+        reserve_price: u128,
         /// The minimum percentage increase between bids
         min_bid_increment_percentage: u128,
         /// The duration of a single auction
         duration: u64,
+        /// Phat Messenger contract reference
+        phat_messenger_ref: PhatMessengerRef,
     }
 
     #[ink(event)]
@@ -111,6 +129,30 @@ mod auction_house {
     }
 
     impl AuctionHouse {
+        /// Default Constructor to Initialize Auction House
+        #[ink(constructor)]
+        pub fn default() -> Self {
+            // Save sender as the contract admin
+            let owner = Self::env().caller();
+            // Hash of the PhatMessenger contract
+            let hash = hex!("a3f91e98edc8ccfb035946133027dd5a3f8694c70e7a27ffdf8056f7b9cc40ab").into();
+            let phat_messenger_ref = PhatMessengerRef::default()
+                .endowment(100000)
+                .salt_bytes(&[0x00])
+                .code_hash(hash)
+                .instantiate()
+                .expect("failed at instantiating the `PhatMessengerRef` contract..");
+            // This call is required in order to correctly initialize the
+            // `Mapping`s of our contract.
+            ink_lang::codegen::initialize_contract(|contract: &mut Self| {
+                contract.owner = owner;
+                contract.time_buffer = Default::default();
+                contract.reserve_price = Default::default();
+                contract.min_bid_increment_percentage = Default::default();
+                contract.duration = Default::default();
+                contract.phat_messenger_ref = phat_messenger_ref;
+            })
+        }
         /// Constructor that initializes the Auction House
         #[ink(constructor)]
         pub fn new(
