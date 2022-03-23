@@ -1,16 +1,16 @@
 [package]
-name = "fat-sample"
+name = "phat-messenger"
 version = "0.1.0"
-authors = ["[your_name] <[your_email]>"]
+authors = ["Joshua <hashwarlock@phala.network>"]
 edition = "2021"
 rust-version = "1.56.1"
 
 [dependencies]
-ink_primitives = { version = "3.0.0-rc9", default-features = false }
-ink_metadata = { version = "3.0.0-rc9", default-features = false, features = ["derive"], optional = true }
-ink_env = { version = "3.0.0-rc9", default-features = false }
-ink_storage = { version = "3.0.0-rc9", default-features = false }
-ink_lang = { version = "3.0.0-rc9", default-features = false }
+ink_primitives = { version = "3.0.0", default-features = false }
+ink_metadata = { version = "3.0.0", default-features = false, features = ["derive"], optional = true }
+ink_env = { version = "3.0.0", default-features = false }
+ink_storage = { version = "3.0.0", default-features = false }
+ink_lang = { version = "3.0.0", default-features = false }
 
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive", "full"] }
 scale-info = { version = "2", default-features = false, features = ["derive"], optional = true }
@@ -20,11 +20,11 @@ safe-regex = { version = "0.2.5", default-features = false }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 
 [lib]
-name = "fat_sample"
+name = "phat_messenger"
 path = "lib.rs"
 crate-type = [
-	# Used for normal contract Wasm blobs.
-	"cdylib",
+    # Used for normal contract Wasm blobs.
+    "cdylib",
 ]
 
 # Needed until https://github.com/paritytech/ink/issues/364 is resolved.
