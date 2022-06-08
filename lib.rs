@@ -21,29 +21,53 @@ mod nouns_subgraph {
     #[derive(Default)]
     pub struct NounsSubgraph {
         admin: AccountId,
+        attestation_privkey: Vec<u8>,
+        attestation_pubkey: Vec<u8>,
         nouns_id: u32,
         current_bid: u128,
         acceptable_price: u128,
         nouns_endpoint: String,
     }
 
+    #[derive(Encode, Decode, Debug)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub struct NounsInfo {
+        id: u32,
+        endTime: String,
+        bids: Vec<u128>,
+        settled: AccountId,
+    }
+
+    #[derive(Encode, Decode, Debug)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub struct SignedNounsInfo {
+        nouns_info: NounsInfo,
+        signature: Vec<u8>,
+    }
+
     #[derive(Encode, Decode, Debug, PartialEq, Eq, Copy, Clone)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum Error {
+        InvalidBody,
         InvalidUrl,
         RequestFailed,
         NoPermissions,
     }
 
-    impl FatSample {
+    impl NounsSubgraph {
         #[ink(constructor)]
         pub fn default() -> Self {
+            // Generate a Sr25519 key pair
+            let privkey = derive_sr25519_key!(b"gist-attestation-key");
+            let pubkey = get_public_key!(&privkey, SigType::Sr25519);
             // Save sender as the contract admin
             let admin = Self::env().caller();
             let nouns_endpoint =
                 "https://api.thegraph.com/subgraphs/name/nounsdao/nouns-subgraph".to_string();
             Self {
                 admin,
+                attestation_privkey: privkey,
+                attestation_pubkey: pubkey,
                 nouns_id: 0,
                 current_bid: 0,
                 acceptable_price: 0,
@@ -61,10 +85,20 @@ mod nouns_subgraph {
             self.current_bid = amount;
             Ok(())
         }
+        /// Signs the `attestation` with the attestation key pair.
+        fn sign_nouns_info(&self, nouns_info: NounsInfo) -> SignedNounsInfo {
+            let encoded = Encode::encode(&nouns_info);
+            let signature = sign!(&encoded, &self.attestation_privkey, SigType::Sr25519);
+            SignedNounsInfo {
+                nouns_info,
+                signature,
+            }
+        }
     }
 
     fn extract_nouns_info(body: &[u8]) -> Result<(), Error> {
-        let body = serde_json_core::from_slice(body)?;
+        let (nouns_info, _): (NounsInfo, usize) =
+            serde_json_core::from_slice(body).or(Err(Error::InvalidBody))?;
         //let current_bid
         Ok(())
     }
